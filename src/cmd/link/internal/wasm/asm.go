@@ -308,7 +308,7 @@ func writeMemorySec(ctxt *ld.Link) {
 	// TODO(neelance): Use lower initial memory size.
 	writeUleb128(ctxt.Out, 1)       // number of memories
 	ctxt.Out.WriteByte(0x00)        // no maximum memory size
-	writeUleb128(ctxt.Out, 1024*16) // minimum (initial) memory size
+	writeUleb128(ctxt.Out, 1024*1)  // minimum (initial) memory size
 
 	writeSecSize(ctxt, sizeOffset)
 }

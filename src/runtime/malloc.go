@@ -248,7 +248,7 @@ const (
 	// logHeapArenaBytes is log_2 of heapArenaBytes. For clarity,
 	// prefer using heapArenaBytes where possible (we need the
 	// constant to compute some other constants).
-	logHeapArenaBytes = (6+20)*(_64bit*(1-sys.GoosWindows)*(1-sys.GoosAix)) + (2+20)*(_64bit*sys.GoosWindows) + (2+20)*(1-_64bit) + (8+20)*sys.GoosAix
+	logHeapArenaBytes = (6+20)*(_64bit*(1-sys.GoosWindows)*(1-sys.GoosAix)) + (2+20)*(_64bit*sys.GoosWindows) + (2+20)*(1-_64bit) + (8+20)*sys.GoosAix - sys.GoosJs
 
 	// heapArenaBitmapBytes is the size of each heap arena's bitmap.
 	heapArenaBitmapBytes = heapArenaBytes / (sys.PtrSize * 8 / 2)
@@ -394,7 +394,7 @@ func mallocinit() {
 	_g_.m.mcache = allocmcache()
 
 	// Create initial arena growth hints.
-	if sys.PtrSize == 8 && GOARCH != "wasm" {
+	if sys.PtrSize == 8 {
 		// On a 64-bit machine, we pick the following hints
 		// because:
 		//
@@ -533,6 +533,8 @@ func mallocinit() {
 //
 // h must be locked.
 func (h *mheap) sysAlloc(n uintptr) (v unsafe.Pointer, size uintptr) {
+	println("sysAlloc", n)
+	println("heapArenaBytes", heapArenaBytes)
 	n = round(n, heapArenaBytes)
 
 	// First, try the arena pre-reservation.
@@ -556,6 +558,7 @@ func (h *mheap) sysAlloc(n uintptr) (v unsafe.Pointer, size uintptr) {
 			// Outside addressable heap. Can't use.
 			v = nil
 		} else {
+			println("calling sysReserve", n)
 			v = sysReserve(unsafe.Pointer(p), n)
 		}
 		if p == uintptr(v) {
@@ -592,6 +595,7 @@ func (h *mheap) sysAlloc(n uintptr) (v unsafe.Pointer, size uintptr) {
 		// All of the hints failed, so we'll take any
 		// (sufficiently aligned) address the kernel will give
 		// us.
+		println("calling sysReserveAligned", n, heapArenaBytes)
 		v, size = sysReserveAligned(nil, n, heapArenaBytes)
 		if v == nil {
 			return nil, 0

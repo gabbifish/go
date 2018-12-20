@@ -41,6 +41,8 @@ var reserveEnd uintptr
 func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 	// TODO(neelance): maybe unify with mem_plan9.go, depending on how https://github.com/WebAssembly/design/blob/master/FutureFeatures.md#finer-grained-control-over-memory turns out
 
+	println("sysReserve", n)
+
 	if reserveEnd < lastmoduledatap.end {
 		reserveEnd = lastmoduledatap.end
 	}
