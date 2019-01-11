@@ -29,7 +29,7 @@ func sysUsed(v unsafe.Pointer, n uintptr) {
 	println("sysUsed", unsafe.Pointer(v), unsafe.Pointer(n))
 }
 
-// A node in a free list. The first node is at lastmoduledatap.end.
+// A node in a free list.
 //
 // TODO(twifkak): Maybe make a buddy allocator instead of a free list. Not sure
 // how to do this cleanly atop an unbounded memory pool. Maybe free list is
@@ -44,7 +44,7 @@ type Free struct {
 }
 var exampleFree = Free{}
 var freeSize = func() uintptr { return unsafe.Sizeof(exampleFree) }
-var freeHead *Free
+var freeHead *Free  // Pointer to the first node.
 
 func printFreeNode(node *Free) {
 	if node != nil {
@@ -69,6 +69,7 @@ func printFreeList() {
 
 // Don't split the stack as this function may be invoked without a valid G,
 // which prevents us from allocating more stack.
+// Plus, I suspect bad things would happen if this were preempted by the GC.
 //go:nosplit
 func sysFree(v unsafe.Pointer, n uintptr, sysStat *uint64) {
 	println("sysFree", v, unsafe.Pointer(n))
@@ -114,7 +115,8 @@ func growEnough() bool /*success*/ {
 	return true
 }
 
-// TODO(twifkak): Does this need go:nosplit?
+// I suspect bad things would happen if this were preempted by the GC.
+//go:nosplit
 func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 	// TODO(neelance): maybe unify with mem_linux.go, depending on how https://github.com/WebAssembly/design/blob/master/FutureFeatures.md#finer-grained-control-over-memory turns out
 
