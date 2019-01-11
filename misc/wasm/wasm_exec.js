@@ -411,7 +411,9 @@
 				offset += 8;
 			});
 
+                        console.log('memory size', this._inst.exports.mem.buffer.byteLength);
 			this._inst.exports.run(argc, argv);
+                        console.log('memory size', this._inst.exports.mem.buffer.byteLength);
 			if (this.exited) {
 				this._resolveExitPromise();
 			}
@@ -451,12 +453,14 @@
 		go.exit = process.exit;
 		WebAssembly.instantiate(fs.readFileSync(process.argv[2]), go.importObject).then((result) => {
 			process.on("exit", (code) => { // Node.js exits if no event handler is pending
+                                console.log('wasm memory size', result.instance.exports.mem.buffer.byteLength);
 				if (code === 0 && !go.exited) {
 					// deadlock, make Go print error and stack traces
 					go._pendingEvent = { id: 0 };
 					go._resume();
 				}
 			});
+                        global.goInst = result.instance;
 			return go.run(result.instance);
 		}).catch((err) => {
 			throw err;
