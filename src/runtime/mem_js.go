@@ -11,6 +11,8 @@ import (
 	"unsafe"
 )
 
+// TODO(twifkak): Figure out how to make this work without gcstoptheworld=1.
+
 // Don't split the stack as this function may be invoked without a valid G,
 // which prevents us from allocating more stack.
 //go:nosplit
@@ -124,13 +126,8 @@ func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 
 	if reserveEnd < lastmoduledatap.end {
 		println("lastmoduledatap.end", unsafe.Pointer(lastmoduledatap.end))
-		reserveEnd = lastmoduledatap.end + freeSize()
-		if !growEnough() {
-			println("can't grow")
-			return nil
-		}
 		println("freeSize", freeSize())
-		//freeHead = nil
+		reserveEnd = lastmoduledatap.end
 	}
 
 	// Try to allocate where requested.
