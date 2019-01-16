@@ -475,7 +475,6 @@ func mallocinit() {
 		// heap reservation.
 
 		const arenaMetaSize = (1 << arenaBits) * unsafe.Sizeof(heapArena{})
-		//println("arenaMetaSize", arenaMetaSize)
 		meta := uintptr(sysReserve(nil, arenaMetaSize))
 		if meta != 0 {
 			mheap_.heapArenaAlloc.init(meta, arenaMetaSize)
@@ -508,9 +507,9 @@ func mallocinit() {
 		// Because we're worried about fragmentation on
 		// 32-bit, we try to make a large initial reservation.
 		arenaSizes := []uintptr{
-			//512 << 20,
-			//256 << 20,
-			//128 << 20,
+			512 << 20,
+			256 << 20,
+			128 << 20,
 		}
 		for _, arenaSize := range arenaSizes {
 			a, size := sysReserveAligned(unsafe.Pointer(p), arenaSize, heapArenaBytes)
@@ -534,8 +533,6 @@ func mallocinit() {
 //
 // h must be locked.
 func (h *mheap) sysAlloc(n uintptr) (v unsafe.Pointer, size uintptr) {
-	//println("sysAlloc", n)
-	//println("heapArenaBytes", heapArenaBytes)
 	n = round(n, heapArenaBytes)
 
 	// First, try the arena pre-reservation.
@@ -559,7 +556,6 @@ func (h *mheap) sysAlloc(n uintptr) (v unsafe.Pointer, size uintptr) {
 			// Outside addressable heap. Can't use.
 			v = nil
 		} else {
-			//println("calling sysReserve", n)
 			v = sysReserve(unsafe.Pointer(p), n)
 		}
 		if p == uintptr(v) {
@@ -596,7 +592,6 @@ func (h *mheap) sysAlloc(n uintptr) (v unsafe.Pointer, size uintptr) {
 		// All of the hints failed, so we'll take any
 		// (sufficiently aligned) address the kernel will give
 		// us.
-		//println("calling sysReserveAligned", n, heapArenaBytes)
 		v, size = sysReserveAligned(nil, n, heapArenaBytes)
 		if v == nil {
 			return nil, 0
