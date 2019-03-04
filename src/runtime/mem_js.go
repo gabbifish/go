@@ -168,8 +168,8 @@ func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 			next = uintptr(unsafe.Pointer(after))
 		}
 		prev.next = next
-		return v
 		unlock(&memlock)
+		return v
 	}
 
 	// Allocate at the end.
