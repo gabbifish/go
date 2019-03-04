@@ -13,9 +13,11 @@ import (
 
 // TODO(twifkak): Figure out how to make this work reliably without
 // gcstoptheworld=1.
+var memlock mutex
 
 // Don't split the stack as this function may be invoked without a valid G,
 // which prevents us from allocating more stack.
+// sysAlloc depends on locking the freelist, which occurs in sysReserve.
 //go:nosplit
 func sysAlloc(n uintptr, sysStat *uint64) unsafe.Pointer {
 	p := sysReserve(nil, n)
@@ -55,12 +57,15 @@ var freeHead *Free  // Pointer to the first node.
 //go:nosplit
 func sysFree(v unsafe.Pointer, n uintptr, sysStat *uint64) {
 	mSysStatDec(sysStat, n)
+	lock(&memlock)
 	if reserveEnd < lastmoduledatap.end {
 		// sysFee called before sysReserve; weird.
+		unlock(&memlock)
 		return
 	}
 	// TODO(twifkak): Do tiny frees happen? How to handle?
 	if n < freeSize() {
+		unlock(&memlock)
 		return
 	}
 	if freeHead == nil {
@@ -78,6 +83,7 @@ func sysFree(v unsafe.Pointer, n uintptr, sysStat *uint64) {
 		prev.next = uintptr(v)
 		// TODO(twifkak): Join adjacent free blocks.
 	}
+	unlock(&memlock)
 }
 
 func sysFault(v unsafe.Pointer, n uintptr) {
@@ -103,6 +109,7 @@ func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 		reserveEnd = lastmoduledatap.end
 	}
 
+	lock(&memlock)
 	// Try to allocate where requested.
 	if v != nil {
 		prev := freeHead
@@ -134,6 +141,7 @@ func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 			} else {
 				prev.next = afterPos
 			}
+			unlock(&memlock)
 			return v
 		}
 	}
@@ -161,14 +169,18 @@ func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 		}
 		prev.next = next
 		return v
+		unlock(&memlock)
 	}
 
 	// Allocate at the end.
 	v = unsafe.Pointer(reserveEnd)
 	reserveEnd += n
 	if !growEnough() {
+		// should decrement reserveEnd?
+		unlock(&memlock)
 		return nil
 	}
+	unlock(&memlock)
 	return v
 }
 
