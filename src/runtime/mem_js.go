@@ -46,26 +46,19 @@ type Free struct {
 }
 var exampleFree = Free{}
 var freeSize = func() uintptr { return unsafe.Sizeof(exampleFree) }
-var freeHead *Free  // Pointer to the first node.
+var freeHead *Free  // Pointer to the first node.	
 
 // TODO(twifkak): Do I need to synchronize sysFree & sysReserve? I hope not.
 // "Concurrent GC" doesn't mean concurrent with itself, I assume.
 
-// Don't split the stack as this function may be invoked without a valid G,
-// which prevents us from allocating more stack.
-// Plus, I suspect bad things would happen if this were preempted by the GC.
 //go:nosplit
-func sysFree(v unsafe.Pointer, n uintptr, sysStat *uint64) {
-	mSysStatDec(sysStat, n)
-	lock(&memlock)
+func freeMem(v unsafe.Pointer, n uintptr) {
 	if reserveEnd < lastmoduledatap.end {
 		// sysFee called before sysReserve; weird.
-		unlock(&memlock)
 		return
 	}
 	// TODO(twifkak): Do tiny frees happen? How to handle?
 	if n < freeSize() {
-		unlock(&memlock)
 		return
 	}
 	if freeHead == nil {
@@ -83,6 +76,16 @@ func sysFree(v unsafe.Pointer, n uintptr, sysStat *uint64) {
 		prev.next = uintptr(v)
 		// TODO(twifkak): Join adjacent free blocks.
 	}
+}
+
+// Don't split the stack as this function may be invoked without a valid G,
+// which prevents us from allocating more stack.
+// Plus, I suspect bad things would happen if this were preempted by the GC.
+//go:nosplit
+func sysFree(v unsafe.Pointer, n uintptr, sysStat *uint64) {
+	mSysStatDec(sysStat, n)
+	lock(&memlock)
+	freeMem(v, n)
 	unlock(&memlock)
 }
 
@@ -100,16 +103,8 @@ func growEnough() bool /*success*/ {
 	return true
 }
 
-// I suspect bad things would happen if this were preempted by the GC.
 //go:nosplit
-func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer {
-	// TODO(neelance): maybe unify with mem_linux.go, depending on how https://github.com/WebAssembly/design/blob/master/FutureFeatures.md#finer-grained-control-over-memory turns out
-
-	if reserveEnd < lastmoduledatap.end {
-		reserveEnd = lastmoduledatap.end
-	}
-
-	lock(&memlock)
+func reserveMem(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 	// Try to allocate where requested.
 	if v != nil {
 		prev := freeHead
@@ -168,7 +163,6 @@ func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 			next = uintptr(unsafe.Pointer(after))
 		}
 		prev.next = next
-		unlock(&memlock)
 		return v
 	}
 
@@ -177,9 +171,22 @@ func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 	reserveEnd += n
 	if !growEnough() {
 		reserveEnd -= n
-		unlock(&memlock)
 		return nil
 	}
+	return v
+}
+
+// I suspect bad things would happen if this were preempted by the GC.
+//go:nosplit
+func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer { // seek to reserve n bytes of memory starting at address v.
+	// TODO(neelance): maybe unify with mem_linux.go, depending on how https://github.com/WebAssembly/design/blob/master/FutureFeatures.md#finer-grained-control-over-memory turns out
+
+	if reserveEnd < lastmoduledatap.end {
+		reserveEnd = lastmoduledatap.end
+	}
+
+	lock(&memlock)
+	v = reserveMem(v, n)
 	unlock(&memlock)
 	return v
 }
