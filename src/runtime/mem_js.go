@@ -176,7 +176,7 @@ func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 	v = unsafe.Pointer(reserveEnd)
 	reserveEnd += n
 	if !growEnough() {
-		// should decrement reserveEnd?
+		reserveEnd -= n
 		unlock(&memlock)
 		return nil
 	}
