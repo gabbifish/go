@@ -106,14 +106,14 @@ func growEnough() bool /*success*/ {
 //go:nosplit
 func reserveMem(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 	// Try to allocate where requested.
-	if v != nil {
+	if v != nil { // todo(gabbi): what happens when v is nil?
 		prev := freeHead
 		cur := (*Free)(nil)
 		if prev != nil {
 			cur = (*Free)(unsafe.Pointer(prev.next))
-		}
+		} // todo(gabbi): What happens when prov is nil...? -> cur will also be nil
 		if cur != nil {
-			for cur.next != 0 && cur.next < uintptr(v) {
+			for cur.next != 0 && cur.next < uintptr(v) { // todo(gabbi): This logic could allow for the selection of a block following v; perhaps this can cause a race condition?
 				prev = cur
 				cur = (*Free)(unsafe.Pointer(cur.next))
 			}
@@ -132,15 +132,15 @@ func reserveMem(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 			afterPos := uintptr(unsafe.Pointer(after))
 			if roomBefore >= freeSize() {
 				cur.size = roomBefore
-				cur.next = afterPos
+				cur.next = afterPos // this only adds a block before the reserved block if there is sufficient space. Otherwise the block is discarded.
 			} else {
 				prev.next = afterPos
 			}
-			unlock(&memlock)
 			return v
 		}
 	}
 
+	// This branch is executed when v is nil (so any pointer can be returned).
 	// Try to find some free space in the middle.
 	// TODO(twifkak): Maybe some non-greedy algorithm, to reduce fragmentation.
 	prev := freeHead
@@ -178,7 +178,7 @@ func reserveMem(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 
 // I suspect bad things would happen if this were preempted by the GC.
 //go:nosplit
-func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer { // seek to reserve n bytes of memory starting at address v.
+func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 	// TODO(neelance): maybe unify with mem_linux.go, depending on how https://github.com/WebAssembly/design/blob/master/FutureFeatures.md#finer-grained-control-over-memory turns out
 
 	if reserveEnd < lastmoduledatap.end {
